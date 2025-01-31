@@ -53,7 +53,7 @@ void GaussSeidel(const SparseM &A, Vec &u, const Vec &b);
 
 void redBlackGaussSeidel(const SparseM &A, Vec &u, const Vec &b, int N);
 
-void update_grid(int N, Vec &u, Vec &p, double d, int idx, int idy, int j);
+void update_grid(int N, Vec &u, Vec &p, double d, int idx, int idy, int j, int num_of_case=4);
 
 void SGS(const SparseM &A, Vec &u, const Vec &b);
 

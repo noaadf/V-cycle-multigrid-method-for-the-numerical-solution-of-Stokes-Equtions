@@ -6,6 +6,7 @@
 # include<Eigen/Sparse>
 # include "utils.h"
 # include <iostream>
+# include <fstream>
 
 std::vector<SparseM> Ru_list;
 std::vector<SparseM> Rp_list;
@@ -34,8 +35,8 @@ void DGS_update(int N,int nu1,Vec &u, Vec &p, SparseM &A, SparseM &B, Vec &f, Ve
                 update_grid(N, u, p, fp[j], idx, idy, j);
             }
         }
-        else{ // Renew every mesh in parallel by dividing into 4 regions
-            #pragma omp parallel for
+        else{ // Renew every mesh in parallel by dividing into 8 regions
+            #pragma omp parallel for 
             for (int region = 0; region < 8; region++) {
                 int start_idx = region * (c / 8);
                 int end_idx = (region == 7) ? c : (region + 1) * (c / 8);
@@ -43,7 +44,10 @@ void DGS_update(int N,int nu1,Vec &u, Vec &p, SparseM &A, SparseM &B, Vec &f, Ve
                 for (int j = start_idx; j < end_idx; j++) {
                     int idx = j / N;
                     int idy = j % N;
-                    update_grid(N, u, p, fp[j], idx, idy, j);
+                    int num_of_case = 4;
+                    if(idx==0 || idx==N-1)num_of_case--;
+                    if(idy==0 || idy==N-1)num_of_case--;
+                    update_grid(N, u, p, fp[j], idx, idy, j, num_of_case);
                 }
             }
         }
@@ -242,9 +246,9 @@ int PCG_solver(SparseM &A, SparseM &B_T, Vec &x, Vec b, int N, double tau, int n
     double rho = r.dot(r);
     double rho_old = rho;
     int k = 0;
-    Vec p = Eigen::VectorXd::Zero(n);
-    Vec w = Eigen::VectorXd::Zero(n);
-    Vec z = Eigen::VectorXd::Zero(n);
+    Vec p = Vec::Zero(n);
+    Vec w = Vec::Zero(n);
+    Vec z = Vec::Zero(n);
     double alpha = 0, beta = 0;
     while(sqrt(rho) > tau * (B_T*x).norm() && k <= 100 && sqrt(rho) > eps*b.norm()){
         k++;
@@ -328,7 +332,7 @@ int main(int argc, char* argv[])
             // calculate error
             double err = cal_err(N, u.first);
             error[i] = err;
-            printf("N: %d, error: %.10f\n", N, err);
+            // printf("N: %d, error: %.10f\n", N, err);
         }
     }
     if (std::string(argv[1]) == "UID"){
@@ -373,26 +377,73 @@ int main(int argc, char* argv[])
     }
     if(std::string(argv[1]) == "IUID"){
         int numbers[] = {64, 128, 256, 512, 1024, 2048, 4096};
-        double error[7];
+        // double error[7];
         double alpha = 1.0, tao = 1e-3;
-        int nu1 = 1, nu2 = 1;
-        for (int i = 0; i < 7; i++){
-            int N = numbers[i];
-            auto start = std::chrono::high_resolution_clock::now();
-            auto [u, ks] = I_Uzawa(N, alpha, tao, nu1, nu2);
-            auto end = std::chrono::high_resolution_clock::now();
-            std::chrono::duration<double> elapsed = end - start;
-            printf("N: %d, k: %d, time: %.10f\n", N, ks.first, elapsed.count());
-            printf("PCG iterations: ");
-            for (int k : ks.second){
-                printf("%d ", k);
-            }
-            printf("\n");
-            // calculate error
-            double err = cal_err(N, u.first);
-            error[i] = err;
-            printf("N: %d, error: %.10f\n", N, err);
+        double tao_list[] = {1e-2, 1e-3, 1e-4, 1e-5, 1e-6};
+        double alpha_list[] = {0.8,0.9, 1.0, 1.1,1.2};
+        int v1_list[] = {0, 1, 2, 3, 4};
+        int v2_list[] = {0, 1, 2, 3, 4};
+        std::ofstream file("test.txt");
+        if (!file.is_open()) { // 检查是否成功打开
+            std::cerr << "无法打开文件！" << std::endl;
+            return 1;
         }
+        for (int i = 1; i < 2; i++){
+            for (int j = 1; j < 2; j++){
+                if (i == 0 && j == 0) continue;
+                int nu1 = v1_list[i], nu2 = v2_list[j];
+                double error[7];
+                double t_list[7];
+                double k_list[7];
+                for (int i = 0; i < 6; i++){
+                    int N = numbers[i];
+                    auto start = std::chrono::high_resolution_clock::now();
+                    auto [u, ks] = I_Uzawa(N, alpha, tao, nu1, nu2);
+                    auto end = std::chrono::high_resolution_clock::now();
+                    std::chrono::duration<double> elapsed = end - start;
+                    t_list[i] = elapsed.count();
+                    k_list[i] = ks.first;
+                    // printf("N: %d, k: %d, time: %.10f\n", N, ks.first, elapsed.count());
+                    // printf("PCG iterations: ");
+                    // for (int k : ks.second){
+                    //     printf("%d ", k);
+                    // }
+                    // printf("\n");
+                    // calculate error
+                    double err = cal_err(N, u.first);
+                    error[i] = err;
+                    // printf("N: %d, error: %.10f\n", N, err);
+                }
+                // file << "alpha: " << alpha << ", tao: " << tao << ", v1: " << nu1 << ", v2: " << nu2 << ", N/L: 2" << std::endl;
+            //     file << "v1: " << nu1 << ", v2: " << nu2 << ' ';
+                for (int i = 0; i < 6; i++)
+                    file << "N: " << numbers[i] << ", error: " << error[i] << ", time: " << t_list[i] << ", outer_iter: " << k_list[i] << std::endl;
+            }
+        }
+        file.close();
     }
     return 0;
 }
+// 1.02
+// N: 64, error: 1.45931e-06, time: 7.02654, outer_iter: 3
+// N: 128, error: 1.45931e-06, time: 6.18486, outer_iter: 3
+// N: 256, error: 1.45931e-06, time: 5.53336, outer_iter: 3
+// N: 512, error: 1.45931e-06, time: 5.47919, outer_iter: 3
+// N: 1024, error: 1.45931e-06, time: 6.17261, outer_iter: 3
+// N: 2048, error: 1.45931e-06, time: 5.28501, outer_iter: 3
+
+// 1.01
+// N: 64, error: 1.45931e-06, time: 8.42778, outer_iter: 3
+// N: 128, error: 1.45931e-06, time: 5.26706, outer_iter: 3
+// N: 256, error: 1.45931e-06, time: 5.14777, outer_iter: 3
+// N: 512, error: 1.45931e-06, time: 5.0262, outer_iter: 3
+// N: 1024, error: 1.45931e-06, time: 5.52609, outer_iter: 3
+// N: 2048, error: 1.45931e-06, time: 5.43109, outer_iter: 3
+
+// `1.0
+// N: 64, error: 1.45931e-06, time: 6.29521, outer_iter: 3
+// N: 128, error: 1.45931e-06, time: 5.33852, outer_iter: 3
+// N: 256, error: 1.45931e-06, time: 5.36688, outer_iter: 3
+// N: 512, error: 1.45931e-06, time: 5.24853, outer_iter: 3
+// N: 1024, error: 1.45931e-06, time: 5.41272, outer_iter: 3
+// N: 2048, error: 1.45931e-06, time: 6.10861, outer_iter: 3

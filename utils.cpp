@@ -353,62 +353,45 @@ void redBlackGaussSeidel(const SparseM &A, Vec &u, const Vec &b,const int N) {
     const int rows = static_cast<int>(u.size());
     const int numU = N * (N - 1); // Size of u part
     const int numV = rows - numU; // Size of v part
+    double omega = 1.0;
 
     // Red and black node partitioning for u and v
     std::vector<int> redNodesU, blackNodesU;
     std::vector<int> redNodesV, blackNodesV;
 
-    // Partition u (horizontal velocity)
-    for (int i = 0; i < N; ++i) {
-        for (int j = 0; j < N - 1; ++j) {
-            int idx = i * (N - 1) + j;
-            if ((i + j) % 2 == 0) {
-                redNodesU.push_back(idx);
-            } else {
-                blackNodesU.push_back(idx);
-            }
-        }
-    }
+    auto updateNodes = [&](bool isRed, bool isU) {
+        int start = isU ? 0 : numU; // Start index for u or v
+        int end = isU ? numU : rows; // End index for u or v
+        int stride = isU ? (N - 1) : N; // Stride for u or v
+        int len = isU ? N : (N - 1); // Length for u or v
 
-    // Partition v (vertical velocity)
-    for (int i = 0; i < N - 1; ++i) {
-        for (int j = 0; j < N; ++j) {
-            int idx = numU + i * N + j;
-            if ((i + j) % 2 == 0) {
-                redNodesV.push_back(idx);
-            } else {
-                blackNodesV.push_back(idx);
-            }
-        }
-    }
-
-    auto updateNodes = [&](const std::vector<int> &nodes) {
-        #pragma omp parallel for
-        for (size_t k = 0; k < nodes.size(); ++k) {
-            int j = nodes[k];
-            double sum = 0;
-            for (SparseM::InnerIterator it(A, j); it; ++it) {
-                const long col = it.col();
-                if (col != j) {
-                    sum += it.value() * u[col];
+        #pragma omp parallel for schedule(static)
+        for (int i = 0; i < len; ++i) {
+            for (int j = 0; j < stride; ++j) {
+                if ((i + j) % 2 == (isRed ? 0 : 1)) { // Check if node is red or black
+                    int idx = start + i * stride + j;
+                    double sum = 0;
+                    for (SparseM::InnerIterator it(A, idx); it; ++it) {
+                        const long col = it.col();
+                        if (col != idx) {
+                            sum += it.value() * u[col];
+                        }
+                    }
+                    u[idx] = (1 - omega) * u[idx] + omega * (b[idx] - sum) / A.coeff(idx, idx); // SOR update
                 }
             }
-            u[j] = (b[j] - sum) / A.coeff(j, j);
         }
     };
 
     // Red-black Gauss-Seidel updates
-    updateNodes(redNodesU); // Update red nodes in u
-    updateNodes(redNodesV); // Update red nodes in v
-    updateNodes(blackNodesU); // Update black nodes in u
-    updateNodes(blackNodesV); // Update black nodes in v
+    updateNodes(true, true);  // Update red nodes in u
+    updateNodes(true, false); // Update red nodes in v
+    updateNodes(false, true); // Update black nodes in u
+    updateNodes(false, false); // Update black nodes in v
 }
 
-void update_grid(int N, Vec &u, Vec &p, double d, int idx, int idy, int j){
-    int num_of_case = 4;
+void update_grid(int N, Vec &u, Vec &p, double d, int idx, int idy, int j, int num_of_case){
     int n = 2*N*(N-1);
-    if(idx==0 || idx==N-1)num_of_case--;
-    if(idy==0 || idy==N-1)num_of_case--;
     double rij = 0;
     int d1 = idx*(N-1)+idy;
     int d2 = idx*(N-1)+idy-1;
