@@ -238,7 +238,7 @@ void CG_solver(SparseM &A, Vec &x, Vec f, int N, double tol){
     double f_dot_f = f.dot(f);
     double tqf = tol*tol*f_dot_f;
     rho = r.dot(r);
-    while (rho > tqf && k<=1000){
+    while (rho > tqf && k<=10000){
         k++;
         if (k == 1){
             p = r;

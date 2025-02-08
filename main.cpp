@@ -56,7 +56,8 @@ void DGS_update(int N,int nu1,Vec &u, Vec &p, SparseM &A, SparseM &B, Vec &f, Ve
 }
 
 void V_cycle(int N, SparseM &A, SparseM &B, Vec &u, Vec &p, Vec &fu, Vec &fp, int L, int nu1, int nu2,int L_max, bool Simplified = false){
-    if(L==0){
+    if(L==1){
+        DGS_update(N,nu1,u,p,A,B,fu,fp,Simplified);
         return;
     }
     // initialization
@@ -321,17 +322,17 @@ int main(int argc, char* argv[])
     if (std::string(argv[1]) == "DGS"){
         int numbers[] = {64, 128, 256, 512, 1024, 2048, 4096, 8192};
         double error[8];
-        for(int i=0; i<7; i++){
+        for(int i=0; i<6; i++){
             int N = numbers[i];
             int L = i+6;
             auto start = std::chrono::high_resolution_clock::now();
-            auto [u, k] = V_cycle_solve(N, L, 3, 1, true);
+            auto [u, k] = V_cycle_solve(N, L, 6, 6, true);
             auto end = std::chrono::high_resolution_clock::now();
             std::chrono::duration<double> elapsed = end - start;
             printf("N: %d, k: %d, time: %.10f\n", N, k, elapsed.count());
             // calculate error
-            double err = cal_err(N, u.first);
-            error[i] = err;
+            // double err = cal_err(N, u.first);
+            // error[i] = err;
             // printf("N: %d, error: %.10f\n", N, err);
         }
     }
@@ -383,13 +384,8 @@ int main(int argc, char* argv[])
         double alpha_list[] = {0.8,0.9, 1.0, 1.1,1.2};
         int v1_list[] = {0, 1, 2, 3, 4};
         int v2_list[] = {0, 1, 2, 3, 4};
-        std::ofstream file("test.txt");
-        if (!file.is_open()) { // 检查是否成功打开
-            std::cerr << "无法打开文件！" << std::endl;
-            return 1;
-        }
-        for (int i = 1; i < 2; i++){
-            for (int j = 1; j < 2; j++){
+        for (int i = 2; i < 3; i++){
+            for (int j = 2; j < 3; j++){
                 if (i == 0 && j == 0) continue;
                 int nu1 = v1_list[i], nu2 = v2_list[j];
                 double error[7];
@@ -403,47 +399,20 @@ int main(int argc, char* argv[])
                     std::chrono::duration<double> elapsed = end - start;
                     t_list[i] = elapsed.count();
                     k_list[i] = ks.first;
-                    // printf("N: %d, k: %d, time: %.10f\n", N, ks.first, elapsed.count());
-                    // printf("PCG iterations: ");
-                    // for (int k : ks.second){
-                    //     printf("%d ", k);
-                    // }
-                    // printf("\n");
+                    printf("N: %d, k: %d, time: %.10f\n", N, ks.first, elapsed.count());
+                    printf("PCG iterations: ");
+                    for (int k : ks.second){
+                        printf("%d ", k);
+                    }
+                    printf("\n");
                     // calculate error
                     double err = cal_err(N, u.first);
                     error[i] = err;
-                    // printf("N: %d, error: %.10f\n", N, err);
+                    printf("N: %d, error: %.10f\n", N, err);
                 }
-                // file << "alpha: " << alpha << ", tao: " << tao << ", v1: " << nu1 << ", v2: " << nu2 << ", N/L: 2" << std::endl;
-            //     file << "v1: " << nu1 << ", v2: " << nu2 << ' ';
-                for (int i = 0; i < 6; i++)
-                    file << "N: " << numbers[i] << ", error: " << error[i] << ", time: " << t_list[i] << ", outer_iter: " << k_list[i] << std::endl;
             }
         }
-        file.close();
+
     }
     return 0;
 }
-// 1.02
-// N: 64, error: 1.45931e-06, time: 7.02654, outer_iter: 3
-// N: 128, error: 1.45931e-06, time: 6.18486, outer_iter: 3
-// N: 256, error: 1.45931e-06, time: 5.53336, outer_iter: 3
-// N: 512, error: 1.45931e-06, time: 5.47919, outer_iter: 3
-// N: 1024, error: 1.45931e-06, time: 6.17261, outer_iter: 3
-// N: 2048, error: 1.45931e-06, time: 5.28501, outer_iter: 3
-
-// 1.01
-// N: 64, error: 1.45931e-06, time: 8.42778, outer_iter: 3
-// N: 128, error: 1.45931e-06, time: 5.26706, outer_iter: 3
-// N: 256, error: 1.45931e-06, time: 5.14777, outer_iter: 3
-// N: 512, error: 1.45931e-06, time: 5.0262, outer_iter: 3
-// N: 1024, error: 1.45931e-06, time: 5.52609, outer_iter: 3
-// N: 2048, error: 1.45931e-06, time: 5.43109, outer_iter: 3
-
-// `1.0
-// N: 64, error: 1.45931e-06, time: 6.29521, outer_iter: 3
-// N: 128, error: 1.45931e-06, time: 5.33852, outer_iter: 3
-// N: 256, error: 1.45931e-06, time: 5.36688, outer_iter: 3
-// N: 512, error: 1.45931e-06, time: 5.24853, outer_iter: 3
-// N: 1024, error: 1.45931e-06, time: 5.41272, outer_iter: 3
-// N: 2048, error: 1.45931e-06, time: 6.10861, outer_iter: 3

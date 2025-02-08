@@ -43,7 +43,7 @@ SparseM R_p(int N);
 
 Vec f(int N);
 
-void CG_solver(SparseM &A, Vec &x, Vec f, const int N, double tol=1e-8);
+void CG_solver(SparseM &A, Vec &x, Vec f, const int N, double tol=1e-9);
 
 int inv_pow_method(SparseMC A, double x0);
 
